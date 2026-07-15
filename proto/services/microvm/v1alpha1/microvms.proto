@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+// Brigade codegen input. Wire-identical to flintlock v0.9.1
+// api/services/microvm/v1alpha1/microvms.proto (pristine copy under proto/vendor/).
+// The grpc-gateway REST/openapiv2 annotations (google.api.http, openapiv2_swagger)
+// have been removed: they affect ONLY the HTTP/JSON gateway, never the gRPC wire
+// format, and Brigade is gRPC-only day 1. Service/message/field definitions are
+// byte-for-byte the upstream contract, so generated stubs match flintlock exactly.
+package microvm.services.api.v1alpha1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/any.proto";
+import "types/microvm.proto";
+
+option go_package = "github.com/liquidmetal-dev/flintlock/api/services/microvm/v1alpha1";
+
+// MicroVM providers a service to create and manage the lifecycle of microvms.
+service MicroVM {
+  rpc CreateMicroVM(CreateMicroVMRequest) returns (CreateMicroVMResponse);
+  rpc DeleteMicroVM(DeleteMicroVMRequest) returns (google.protobuf.Empty);
+  rpc GetMicroVM(GetMicroVMRequest) returns (GetMicroVMResponse);
+  rpc ListMicroVMs(ListMicroVMsRequest) returns (ListMicroVMsResponse);
+  rpc ListMicroVMsStream(ListMicroVMsRequest) returns (stream ListMessage);
+}
+
+message CreateMicroVMRequest {
+  flintlock.types.MicroVMSpec microvm = 1;
+  map<string, google.protobuf.Any> metadata = 2;
+}
+
+message CreateMicroVMResponse {
+  flintlock.types.MicroVM microvm = 1;
+}
+
+message DeleteMicroVMRequest {
+  string uid = 1;
+}
+
+message GetMicroVMRequest {
+  string uid = 1;
+}
+
+message GetMicroVMResponse {
+  flintlock.types.MicroVM microvm = 1;
+}
+
+message ListMicroVMsRequest {
+  string namespace = 1;
+  optional string name = 2;
+}
+
+message ListMicroVMsResponse {
+  repeated flintlock.types.MicroVM microvm = 1;
+}
+
+message ListMessage {
+  flintlock.types.MicroVM microvm = 1;
+}
