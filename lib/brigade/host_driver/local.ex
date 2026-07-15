@@ -12,8 +12,32 @@ defmodule Brigade.HostDriver.Local do
   alias Microvm.Services.Api.V1alpha1, as: Api
 
   @impl true
-  def connect(%Brigade.Host{endpoint: endpoint}) do
-    GRPC.Stub.connect(endpoint)
+  def connect(%Brigade.Host{endpoint: endpoint} = host) do
+    # Auth headers ride the channel, so every RPC on it carries the token; TLS
+    # creds (if configured) secure the hop. Topology A over loopback is usually
+    # tokenless/plaintext; both paths are wired for topology B (remote hosts).
+    opts =
+      []
+      |> put_headers(host.auth_token)
+      |> put_cred(host.tls)
+
+    GRPC.Stub.connect(endpoint, opts)
+  end
+
+  defp put_headers(opts, nil), do: opts
+
+  defp put_headers(opts, token),
+    do: Keyword.put(opts, :headers, [{"authorization", "Bearer " <> token}])
+
+  defp put_cred(opts, nil), do: opts
+
+  defp put_cred(opts, %{} = tls) do
+    ssl =
+      tls
+      |> Map.take([:cacertfile, :certfile, :keyfile])
+      |> Enum.map(fn {k, v} -> {k, String.to_charlist(v)} end)
+
+    Keyword.put(opts, :cred, GRPC.Credential.new(ssl: ssl))
   end
 
   @impl true

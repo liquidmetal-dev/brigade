@@ -108,6 +108,7 @@ defmodule Brigade.Scheduler do
       not in_quorum?(state) ->
         # Split-brain guard: a minority partition must not place VMs (would
         # overcommit hosts the majority is also scheduling). Reads stay available.
+        rejected(:no_quorum, demand)
         {:reply, {:error, :no_quorum}, state}
 
       true ->
@@ -150,6 +151,7 @@ defmodule Brigade.Scheduler do
   defp do_reserve(demand, state) do
     case state.store.list_hosts() do
       {:ok, []} ->
+        rejected(:no_hosts, demand)
         {:reply, {:error, :no_hosts}, state}
 
       {:ok, hosts} ->
@@ -160,15 +162,32 @@ defmodule Brigade.Scheduler do
           {:ok, host} ->
             ref = make_ref()
             hold = {host.id, demand.vcpu, demand.memory_mb}
+
+            :telemetry.execute(
+              [:brigade, :schedule, :placed],
+              %{vcpu: demand.vcpu, memory_mb: demand.memory_mb},
+              %{host_id: host.id, strategy: state.strategy}
+            )
+
             {:reply, {:ok, %{host: host, ref: ref}}, put_in(state.in_flight[ref], hold)}
 
           :none ->
+            rejected(:no_capacity, demand)
             {:reply, {:error, :no_capacity}, state}
         end
 
       {:error, _reason} ->
+        rejected(:no_hosts, demand)
         {:reply, {:error, :no_hosts}, state}
     end
+  end
+
+  defp rejected(reason, demand) do
+    :telemetry.execute(
+      [:brigade, :schedule, :rejected],
+      %{vcpu: demand.vcpu, memory_mb: demand.memory_mb},
+      %{reason: reason}
+    )
   end
 
   # Mark every host on a dead node unreachable: release its in-flight holds and
