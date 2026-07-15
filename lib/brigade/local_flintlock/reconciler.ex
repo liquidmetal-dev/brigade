@@ -70,6 +70,13 @@ defmodule Brigade.LocalFlintlock.Reconciler do
           end)
 
         cleanup_unknowns(host, namespaces)
+
+        :telemetry.execute(
+          [:brigade, :reconcile, :stop],
+          summary,
+          %{host_id: host.id}
+        )
+
         summary
       after
         GRPC.Stub.disconnect(channel)

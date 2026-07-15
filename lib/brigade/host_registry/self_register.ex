@@ -62,7 +62,9 @@ defmodule Brigade.HostRegistry.SelfRegister do
       capacity: to_res(Keyword.get(cfg, :capacity, [])),
       reserve: to_res(Keyword.get(cfg, :reserve, [])),
       providers: Keyword.get(cfg, :providers, []),
-      status: :available
+      status: :available,
+      auth_token: Application.get_env(:brigade, :flintlock_auth_token),
+      tls: Application.get_env(:brigade, :flintlock_tls)
     }
   end
 

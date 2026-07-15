@@ -34,6 +34,14 @@ defmodule Brigade.MixProject do
       # Distributed Erlang: mesh formation + cluster-singleton scheduler.
       {:libcluster, "~> 3.5"},
       {:horde, "~> 0.9"},
+      # Observability: telemetry events + prometheus scrape endpoint.
+      {:telemetry, "~> 1.2"},
+      {:telemetry_metrics, "~> 1.0"},
+      {:telemetry_metrics_prometheus, "~> 1.1"},
+      # Status HTTP endpoint.
+      {:plug, "~> 1.16"},
+      {:bandit, "~> 1.5"},
+      {:jason, "~> 1.4"},
       # protoc-gen-elixir wrapper — `mix protobuf.generate` (codegen only).
       {:protobuf_generate, "~> 0.1", only: :dev, runtime: false}
     ]

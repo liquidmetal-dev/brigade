@@ -24,7 +24,9 @@ defmodule Brigade.Host do
           capacity: resources(),
           reserve: resources(),
           providers: [String.t()],
-          status: status()
+          status: status(),
+          auth_token: String.t() | nil,
+          tls: map() | nil
         }
 
   @enforce_keys [:id, :endpoint, :capacity]
@@ -35,7 +37,11 @@ defmodule Brigade.Host do
             capacity: %{vcpu: 0, memory_mb: 0},
             reserve: %{vcpu: 0, memory_mb: 0},
             providers: [],
-            status: :unreachable
+            status: :unreachable,
+            # south-edge auth to this host's flintlock (topology A: usually nil on loopback)
+            auth_token: nil,
+            # nil = plaintext; %{cacertfile:, certfile:, keyfile:} = mTLS
+            tls: nil
 
   @doc "Schedulable capacity = declared total minus OS/BEAM reserve headroom."
   @spec schedulable(t()) :: resources()

@@ -66,6 +66,9 @@ defmodule FakeFlintlock.Endpoint do
   @moduledoc false
   use GRPC.Endpoint
 
+  # Reuse Brigade's auth interceptor so south-edge auth can be tested: the fake
+  # gates on :fake_flintlock_token (nil = disabled).
+  intercept(Brigade.GRPC.AuthInterceptor, token_key: :fake_flintlock_token)
   run(FakeFlintlock.Server)
 end
 

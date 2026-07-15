@@ -11,8 +11,14 @@ config :brigade,
   # north edge: Brigade's own gRPC listen port (distinct from flintlock's 9090)
   start_server: true,
   grpc_port: 9091,
+  # north edge: require this basic-auth token from clients (nil = auth disabled).
+  auth_token: nil,
   # south edge: local flintlockd (topology A)
   flintlock_endpoint: "localhost:9090",
+  # south-edge auth to flintlock (nil on loopback; set for topology B).
+  flintlock_auth_token: nil,
+  # nil = plaintext; %{cacertfile:, certfile:, keyfile:} = mTLS to flintlock.
+  flintlock_tls: nil,
   self_register: true,
   # Local flintlock liveness + drift reconcile (topology A).
   local_flintlock: true,
@@ -27,6 +33,12 @@ config :brigade,
   #   ]
   # Epmd/DNS strategies work too — see libcluster docs.
   cluster_topologies: [],
+  # Observability.
+  metrics_enabled: true,
+  metrics_port: 9568,
+  metrics_poll_ms: 10_000,
+  status_enabled: true,
+  status_port: 9600,
   # this host's declared capacity + labels (see plan Q5/Q16)
   host: [
     labels: %{},

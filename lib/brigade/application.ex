@@ -25,6 +25,8 @@ defmodule Brigade.Application do
         Brigade.Cluster.child_specs(scheduler_opts) ++
         maybe_self_register() ++
         maybe_local_flintlock() ++
+        maybe_telemetry() ++
+        maybe_status_endpoint() ++
         maybe_server()
 
     # M3+: LocalFlintlock health + reconciler, dual-liveness, quorum gate. Telemetry (M4).
@@ -40,6 +42,21 @@ defmodule Brigade.Application do
 
       topologies ->
         [{Cluster.Supervisor, [topologies, [name: Brigade.ClusterSupervisor]]}]
+    end
+  end
+
+  defp maybe_telemetry do
+    if Application.get_env(:brigade, :metrics_enabled, true),
+      do: Brigade.Telemetry.child_specs(),
+      else: []
+  end
+
+  defp maybe_status_endpoint do
+    if Application.get_env(:brigade, :status_enabled, true) do
+      port = Application.get_env(:brigade, :status_port, 9600)
+      [{Bandit, plug: Brigade.Status.Router, port: port}]
+    else
+      []
     end
   end
 

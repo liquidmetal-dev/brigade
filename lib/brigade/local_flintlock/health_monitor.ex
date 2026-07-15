@@ -47,6 +47,12 @@ defmodule Brigade.LocalFlintlock.HealthMonitor do
         if host.status != status do
           Logger.info("local flintlock #{host.endpoint}: #{host.status} -> #{status}")
           Brigade.LocalFlintlock.store().put_host(%{host | status: status})
+
+          :telemetry.execute(
+            [:brigade, :host, :status],
+            %{up: if(status == :available, do: 1, else: 0)},
+            %{host_id: host.id, status: status}
+          )
         end
 
         status
