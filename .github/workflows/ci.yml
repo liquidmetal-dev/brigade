@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: format · compile · test
+    runs-on: ubuntu-latest
+
+    env:
+      MIX_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Versions match mise.toml ([tools]) exactly — keep them in sync.
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.18.4"
+          otp-version: "27.3.4.14"
+
+      - name: Cache deps and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Check formatting
+        run: mix format --check-formatted
+
+      - name: Compile (warnings as errors)
+        run: mix compile --warnings-as-errors
+
+      - name: Test (hermetic)
+        run: mix test
+
+      # Real Erlang peer nodes via :peer on the single runner. The test VM must
+      # be started in distributed mode (named node + cookie) — plain
+      # `mix test --include distributed` cannot bootstrap distribution and the
+      # setup_all bails with :nodistribution. Separate step so a distributed-only
+      # failure is distinguishable; these can be flakier than the hermetic suite.
+      - name: Test (distributed)
+        run: elixir --name ci@127.0.0.1 --cookie brigade_ci -S mix test --include distributed
