@@ -18,6 +18,10 @@ defmodule Brigade.GRPC.Server do
   alias Flintlock.Types
   alias Brigade.{Scheduler, VMRecord}
 
+  # gRPC statuses where a create's outcome is genuinely unknown (may or may not
+  # have created the VM) — resolved by the per-host reconciler.
+  @ambiguous [:deadline_exceeded, :unavailable, :unknown, :aborted]
+
   # --- Create ---------------------------------------------------------------
 
   def create_micro_vm(%Api.CreateMicroVMRequest{microvm: nil}, _stream) do
@@ -38,6 +42,11 @@ defmodule Brigade.GRPC.Server do
 
       {:error, :no_hosts} ->
         raise GRPC.RPCError, status: :unavailable, message: "no schedulable hosts"
+
+      {:error, :no_quorum} ->
+        raise GRPC.RPCError,
+          status: :unavailable,
+          message: "scheduler partition lacks quorum; placement refused"
     end
   end
 
@@ -50,18 +59,45 @@ defmodule Brigade.GRPC.Server do
           :ok = Scheduler.confirm(ref, record(mv, host, spec), scheduler())
           resp
 
+        {:error, %GRPC.RPCError{status: status} = err} when status in @ambiguous ->
+          # Ambiguous: flintlock may or may not have created the VM. Drop a
+          # placeholder so the per-host reconciler scans this namespace, adopts
+          # the VM if it exists, and cleans up otherwise (plan Q7).
+          resolve_via_reconcile(host, ref, spec)
+          raise err
+
         {:error, %GRPC.RPCError{} = err} ->
           Scheduler.release(ref, scheduler())
           raise err
 
         {:error, reason} ->
-          Scheduler.release(ref, scheduler())
+          # Transport-level failure is also ambiguous.
           Logger.error("flintlock create failed on #{host.id}: #{inspect(reason)}")
-          raise GRPC.RPCError, status: :internal, message: "host create failed"
+          resolve_via_reconcile(host, ref, spec)
+
+          raise GRPC.RPCError,
+            status: :unavailable,
+            message: "host create ambiguous; will reconcile"
       end
     after
       GRPC.Stub.disconnect(channel)
     end
+  end
+
+  defp resolve_via_reconcile(host, ref, spec) do
+    Scheduler.release(ref, scheduler())
+
+    placeholder = %VMRecord{
+      uid: "unknown:" <> Base.encode16(:crypto.strong_rand_bytes(6), case: :lower),
+      namespace: spec.namespace,
+      host_id: host.id,
+      vcpu: spec.vcpu,
+      memory_mb: spec.memory_in_mb,
+      provider: spec.provider,
+      state: :unknown
+    }
+
+    store().put_vm(placeholder)
   end
 
   defp record(%Types.MicroVM{spec: mvspec} = _mv, host, req_spec) do
