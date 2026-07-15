@@ -25,6 +25,7 @@ mise exec -- mix test                         # hermetic (fake flintlock, no har
 # plain `mix test --include distributed` fails with :nodistribution:
 mise exec -- elixir --name dev@127.0.0.1 --cookie brigade_test -S mix test --include distributed
 mise exec -- mix protobuf.generate            # proto codegen only (dev dep)
+mise exec -- mix proto.bump v0.9.2            # bump pinned flintlock protos (download+strip+regen)
 ```
 
 ## Layout
