@@ -7,7 +7,10 @@ defmodule Brigade.Application do
 
   @impl true
   def start(_type, _args) do
-    scheduler_opts = [strategy: Application.get_env(:brigade, :scheduler_strategy)]
+    scheduler_opts = [
+      strategy: Application.get_env(:brigade, :scheduler_strategy),
+      min_cluster_size: Application.get_env(:brigade, :min_cluster_size, 1)
+    ]
 
     # Horde registry + dynamic supervisor + singleton scheduler starter.
     children =
@@ -21,6 +24,7 @@ defmodule Brigade.Application do
         maybe_libcluster() ++
         Brigade.Cluster.child_specs(scheduler_opts) ++
         maybe_self_register() ++
+        maybe_local_flintlock() ++
         maybe_server()
 
     # M3+: LocalFlintlock health + reconciler, dual-liveness, quorum gate. Telemetry (M4).
@@ -37,6 +41,12 @@ defmodule Brigade.Application do
       topologies ->
         [{Cluster.Supervisor, [topologies, [name: Brigade.ClusterSupervisor]]}]
     end
+  end
+
+  defp maybe_local_flintlock do
+    if Application.get_env(:brigade, :local_flintlock, true),
+      do: [Brigade.LocalFlintlock],
+      else: []
   end
 
   defp maybe_self_register do

@@ -81,12 +81,73 @@ defmodule Brigade.Scheduler do
   def init(opts) do
     strategy = Keyword.get(opts, :strategy, Brigade.Scheduler.Strategy.LeastLoaded)
     store = Keyword.get(opts, :store, Brigade.Store.Mnesia)
-    # in_flight: %{ref => {host_id, vcpu, memory_mb}}
-    {:ok, %{strategy: strategy, store: store, in_flight: %{}}}
+
+    min_cluster_size =
+      Keyword.get(opts, :min_cluster_size, Application.get_env(:brigade, :min_cluster_size, 1))
+
+    # Watch the mesh so we can mark hosts unreachable when their node dies.
+    :net_kernel.monitor_nodes(true)
+
+    state = %{
+      strategy: strategy,
+      store: store,
+      min_cluster_size: min_cluster_size,
+      # in_flight: %{ref => {host_id, vcpu, memory_mb}}
+      in_flight: %{}
+    }
+
+    # On failover the scheduler re-homes to a survivor; reconcile host liveness
+    # against the current mesh so stale `:available` hosts don't get placements.
+    sweep_unreachable(state)
+    {:ok, state}
   end
 
   @impl true
   def handle_call({:reserve, demand}, _from, state) do
+    cond do
+      not in_quorum?(state) ->
+        # Split-brain guard: a minority partition must not place VMs (would
+        # overcommit hosts the majority is also scheduling). Reads stay available.
+        {:reply, {:error, :no_quorum}, state}
+
+      true ->
+        do_reserve(demand, state)
+    end
+  end
+
+  @impl true
+  def handle_call({:confirm, ref, record}, _from, state) do
+    :ok = state.store.put_vm(%{record | state: :created})
+    {:reply, :ok, %{state | in_flight: Map.delete(state.in_flight, ref)}}
+  end
+
+  @impl true
+  def handle_call({:release, ref}, _from, state) do
+    {:reply, :ok, %{state | in_flight: Map.delete(state.in_flight, ref)}}
+  end
+
+  @impl true
+  def handle_info({:nodedown, down}, state) do
+    Logger.warning("node #{down} down — marking its hosts unreachable")
+    {:noreply, mark_node_unreachable(down, state)}
+  end
+
+  @impl true
+  def handle_info({:nodeup, up}, state) do
+    # The joining node re-registers its own host as available (self-register on
+    # boot). Nothing to do here beyond noting it.
+    Logger.info("node #{up} up")
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info(_msg, state), do: {:noreply, state}
+
+  # --- liveness / quorum ----------------------------------------------------
+
+  defp in_quorum?(state), do: length([Node.self() | Node.list()]) >= state.min_cluster_size
+
+  defp do_reserve(demand, state) do
     case state.store.list_hosts() do
       {:ok, []} ->
         {:reply, {:error, :no_hosts}, state}
@@ -110,15 +171,58 @@ defmodule Brigade.Scheduler do
     end
   end
 
-  @impl true
-  def handle_call({:confirm, ref, record}, _from, state) do
-    :ok = state.store.put_vm(%{record | state: :created})
-    {:reply, :ok, %{state | in_flight: Map.delete(state.in_flight, ref)}}
+  # Mark every host on a dead node unreachable: release its in-flight holds and
+  # flag its VMs unreachable (last-known state; adopt-on-return via reconcile).
+  defp mark_node_unreachable(down, state) do
+    {:ok, hosts} = state.store.list_hosts()
+    dead = Enum.filter(hosts, &(&1.node == down))
+
+    Enum.each(dead, fn host ->
+      state.store.put_host(%{host | status: :unreachable})
+      flag_vms_unreachable(host, state)
+    end)
+
+    dead_ids = MapSet.new(dead, & &1.id)
+
+    in_flight =
+      for {ref, {hid, _, _} = h} <- state.in_flight,
+          not MapSet.member?(dead_ids, hid),
+          into: %{},
+          do: {ref, h}
+
+    %{state | in_flight: in_flight}
   end
 
-  @impl true
-  def handle_call({:release, ref}, _from, state) do
-    {:reply, :ok, %{state | in_flight: Map.delete(state.in_flight, ref)}}
+  # Sweep at init (failover): any host whose node isn't currently connected is unreachable.
+  defp sweep_unreachable(state) do
+    connected = MapSet.new([Node.self() | Node.list()])
+
+    case state.store.list_hosts() do
+      {:ok, hosts} ->
+        Enum.each(hosts, fn host ->
+          cond do
+            host.node == nil -> :ok
+            MapSet.member?(connected, host.node) -> :ok
+            host.status == :unreachable -> :ok
+            true -> state.store.put_host(%{host | status: :unreachable})
+          end
+        end)
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp flag_vms_unreachable(host, state) do
+    case state.store.list_vms_on_host(host.id) do
+      {:ok, vms} ->
+        Enum.each(vms, fn vm ->
+          if vm.state == :created, do: state.store.put_vm(%{vm | state: :unreachable})
+        end)
+
+      _ ->
+        :ok
+    end
   end
 
   # Pair each host with its currently free schedulable capacity.

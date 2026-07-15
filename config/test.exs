@@ -5,4 +5,6 @@ import Config
 # auto-start the north endpoint or self-register a host.
 config :brigade,
   start_server: false,
-  self_register: false
+  self_register: false,
+  # Tests drive the health monitor / reconciler explicitly via check_now/reconcile_now.
+  local_flintlock: false
