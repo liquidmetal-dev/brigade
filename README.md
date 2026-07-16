@@ -89,6 +89,29 @@ All settings live under `config :brigade` (see `config/config.exs`). Key ones:
 Labels prefixed `brigade.scheduling/` on a `MicroVMSpec` become placement constraints
 (matched against host labels); all labels are still passed through to flintlock.
 
+## Releases
+
+Pushing a semver tag runs `.github/workflows/release.yml`, which publishes two
+artifacts (version taken from the tag, `v` stripped):
+
+```sh
+git tag v1.2.3 && git push origin v1.2.3   # -rc/-beta suffixes → prerelease
+```
+
+- **OTP tarball** — `mix release` output attached to the GitHub Release. Bundles ERTS,
+  built on `ubuntu-latest` (glibc, linux/amd64); the target host must match that
+  OS/arch. Unpack and run `bin/brigade start`.
+- **Container image** — pushed to `ghcr.io/liquidmetal-dev/brigade:1.2.3` (plus
+  `:1.2` and, for stable tags, `:latest`):
+
+  ```sh
+  docker run --rm ghcr.io/liquidmetal-dev/brigade:1.2.3 version
+  ```
+
+Prod settings are read from the environment at boot via `config/runtime.exs`
+(`BRIGADE_GRPC_PORT`, `BRIGADE_AUTH_TOKEN`, `FLINTLOCK_ENDPOINT`, …); unset vars fall
+back to the `config/config.exs` defaults above.
+
 ## Testing
 
 ```sh

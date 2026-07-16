@@ -1,0 +1,22 @@
+# Build artifacts and deps — reassembled inside the image.
+_build/
+deps/
+.elixir_ls/
+
+# VCS and CI.
+.git/
+.github/
+.gitignore
+
+# Local tooling / editor / agent output.
+.formatter.exs
+mise.toml
+graphify-out/
+*.log
+
+# Docs and non-source files not needed to build the release.
+README.md
+CLAUDE.md
+AGENTS.md
+proto/
+test/
