@@ -4,11 +4,27 @@ defmodule Brigade.MixProject do
   def project do
     [
       app: :brigade,
-      version: "0.1.0",
+      # Version is normally driven by the pushed git tag in CI
+      # (BRIGADE_VERSION, set by .github/workflows/release.yml). The literal
+      # is the local/dev fallback.
+      version: System.get_env("BRIGADE_VERSION") || "0.1.0",
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
+      releases: releases(),
       deps: deps()
+    ]
+  end
+
+  # `mix release` config. The :tar step emits a self-contained
+  # _build/prod/brigade-<version>.tar.gz (bundles ERTS) for GitHub Releases;
+  # the Dockerfile uses the assembled release for the GHCR image.
+  defp releases do
+    [
+      brigade: [
+        include_executables_for: [:unix],
+        steps: [:assemble, :tar]
+      ]
     ]
   end
 
@@ -29,8 +45,10 @@ defmodule Brigade.MixProject do
     [
       # gRPC server (north edge) + client (south edge, calls flintlock).
       {:grpc, "~> 0.10"},
+      # protobuf >= 0.14 bundles the Google.Protobuf.* well-known types
+      # (Empty, Timestamp, Struct, …), so no separate google_protos dep — it
+      # would ship duplicate modules and fail `mix release` assembly.
       {:protobuf, "~> 0.14"},
-      {:google_protos, "~> 0.4"},
       # Distributed Erlang: mesh formation + cluster-singleton scheduler.
       {:libcluster, "~> 3.5"},
       {:horde, "~> 0.9"},
