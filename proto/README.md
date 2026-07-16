@@ -28,6 +28,20 @@ builds (no protoc needed at deploy).
 
 ## Bumping the pin
 
+One command does the whole checklist — download, gateway strip, codegen, format:
+
+```
+mise exec -- mix proto.bump v0.9.2
+```
+
+It re-fetches both protos at the given ref into `vendor/`, re-derives the
+codegen copies (re-applying the gateway strip to `microvms.proto`),
+regenerates the stubs, and updates the pin reference above. Then review
+`git diff proto/vendor/` and run the fake-flintlock conformance tests
+(`mise exec -- mix test`).
+
+The equivalent manual steps:
+
 1. Re-fetch upstream `api/services/microvm/v1alpha1/microvms.proto` and
    `api/types/microvm.proto` at the new tag into `vendor/`.
 2. `diff` against the codegen copies; re-apply the gateway strip to `microvms.proto`.

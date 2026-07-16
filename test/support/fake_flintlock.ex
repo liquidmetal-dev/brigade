@@ -24,8 +24,24 @@ defmodule FakeFlintlock do
     %{id: @store, start: {Agent, :start_link, [fn -> %{} end, [name: @store]]}}
   end
 
-  @doc "Start the gRPC endpoint listening on `port`. Pair with `stop_endpoint/0`."
-  def start_endpoint(port), do: GRPC.Server.start_endpoint(FakeFlintlock.Endpoint, port)
+  @doc """
+  Start the gRPC endpoint listening on `port`. Pair with `stop_endpoint/0`.
+
+  Retries on `:eaddrinuse`: `stop_endpoint/0` returns before the OS actually
+  releases the listen socket (Ranch closes it asynchronously), so a prior
+  case's port can still be bound when the next `setup` re-binds the same fixed
+  port. Bounded retry absorbs that race instead of failing the setup.
+  """
+  def start_endpoint(port, retries \\ 20) do
+    case GRPC.Server.start_endpoint(FakeFlintlock.Endpoint, port) do
+      {:error, :eaddrinuse} when retries > 0 ->
+        Process.sleep(50)
+        start_endpoint(port, retries - 1)
+
+      result ->
+        result
+    end
+  end
 
   @doc "Stop the gRPC endpoint."
   def stop_endpoint, do: GRPC.Server.stop_endpoint(FakeFlintlock.Endpoint)
