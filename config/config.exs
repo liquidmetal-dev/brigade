@@ -8,6 +8,9 @@ config :brigade,
   # Split-brain guard: scheduler places only when its partition has >= this many
   # nodes. 1 = no gating (single-node/dev). Set to majority for real clusters.
   min_cluster_size: 1,
+  # Guardian re-checks that the singleton scheduler is alive this often (and on
+  # every mesh membership change), resurrecting it on a survivor after failover.
+  scheduler_guardian_interval_ms: 3_000,
   # north edge: Brigade's own gRPC listen port (distinct from flintlock's 9090)
   start_server: true,
   grpc_port: 9091,

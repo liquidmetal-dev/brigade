@@ -44,19 +44,48 @@ defmodule Brigade.Scheduler do
   @typedoc "What a CreateMicroVM asks of a host."
   @type demand :: Brigade.Scheduler.Strategy.demand()
 
-  @doc "Reserve capacity for a demand. Returns the chosen host + a ref to confirm/release."
-  @spec reserve(demand(), GenServer.server()) ::
-          {:ok, %{host: Host.t(), ref: reference()}} | {:error, :no_capacity | :no_hosts}
-  def reserve(demand, server \\ via()), do: GenServer.call(server, {:reserve, demand})
+  @doc """
+  Reserve capacity for a demand. Returns the chosen host + a ref to confirm/release.
 
-  @doc "Confirm a reservation: persist the created VM record, drop the in-flight hold."
+  If the singleton is momentarily absent (mid-failover), the `GenServer.call` exits
+  with `:noproc`; we catch that and return `{:error, :scheduler_unavailable}` so the
+  gRPC edge can surface a retryable `UNAVAILABLE` instead of a raw `UNKNOWN`.
+  """
+  @spec reserve(demand(), GenServer.server()) ::
+          {:ok, %{host: Host.t(), ref: reference()}}
+          | {:error, :no_capacity | :no_hosts | :no_quorum | :scheduler_unavailable}
+  def reserve(demand, server \\ via()), do: safe_call(server, {:reserve, demand})
+
+  @doc """
+  Confirm a reservation: persist the created VM record, drop the in-flight hold.
+
+  Best-effort: by confirm time the VM already exists on the host, so a scheduler
+  that died mid-create must not fail the whole RPC. On exit we log and return `:ok`;
+  the per-host reconciler adopts the (then un-persisted) VM.
+  """
   @spec confirm(reference(), VMRecord.t(), GenServer.server()) :: :ok
   def confirm(ref, %VMRecord{} = record, server \\ via()),
-    do: GenServer.call(server, {:confirm, ref, record})
+    do: best_effort_call(server, {:confirm, ref, record})
 
   @doc "Release a reservation (create failed): drop the in-flight hold, no record persisted."
   @spec release(reference(), GenServer.server()) :: :ok
-  def release(ref, server \\ via()), do: GenServer.call(server, {:release, ref})
+  def release(ref, server \\ via()), do: best_effort_call(server, {:release, ref})
+
+  # Map a dead/absent singleton (`:exit` from the via-tuple call) to a typed error.
+  defp safe_call(server, msg) do
+    GenServer.call(server, msg)
+  catch
+    :exit, _reason -> {:error, :scheduler_unavailable}
+  end
+
+  # Post-reserve calls where the create already happened: swallow a dead scheduler.
+  defp best_effort_call(server, msg) do
+    GenServer.call(server, msg)
+  catch
+    :exit, reason ->
+      Logger.warning("scheduler unavailable for #{inspect(elem(msg, 0))}: #{inspect(reason)}")
+      :ok
+  end
 
   @doc "Build a demand from an incoming CreateMicroVM spec."
   @spec demand_from_spec(Flintlock.Types.MicroVMSpec.t()) :: demand()
