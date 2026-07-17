@@ -2,8 +2,10 @@ defmodule Brigade.Store.Mnesia do
   @moduledoc """
   Mnesia implementation of `Brigade.Store`.
 
-  Day-1 tables are `ram_copies` (in-memory, replicated across the mesh) — disc
-  persistence is an M4 hardening add. Two tables:
+  Day-1 tables are `ram_copies` (in-memory) — disc persistence is an M4
+  hardening add. Replication across the mesh is **not** automatic: it is
+  established explicitly at join time by `Brigade.Store.Mnesia.Cluster` (schema
+  merge + a local `ram_copies` copy on every node). Two tables:
 
     * `:brigade_vms`   — key `uid`, indexed on `namespace` and `host_id`, value
       is the full `Brigade.VMRecord` struct.
@@ -22,32 +24,12 @@ defmodule Brigade.Store.Mnesia do
 
   # --- setup ----------------------------------------------------------------
 
-  @doc "Create tables if absent (idempotent). Called by the setup worker at boot."
-  def setup! do
-    :mnesia.start()
-
-    create_table(@vms,
-      attributes: [:uid, :namespace, :host_id, :record],
-      index: [:namespace, :host_id],
-      ram_copies: [node()]
-    )
-
-    create_table(@hosts,
-      attributes: [:id, :record],
-      ram_copies: [node()]
-    )
-
-    :ok = :mnesia.wait_for_tables([@vms, @hosts], 10_000)
-    :ok
-  end
-
-  defp create_table(name, opts) do
-    case :mnesia.create_table(name, opts) do
-      {:atomic, :ok} -> :ok
-      {:aborted, {:already_exists, ^name}} -> :ok
-      {:aborted, reason} -> raise "mnesia create_table #{name} failed: #{inspect(reason)}"
-    end
-  end
+  @doc """
+  Ensure the tables exist and are joined to the mesh. Thin wrapper over
+  `Brigade.Store.Mnesia.Cluster.join/1` — kept for the "tables exist after this
+  returns" contract. `Brigade.Store.Mnesia.Cluster` is the supervised worker.
+  """
+  def setup!, do: Brigade.Store.Mnesia.Cluster.join(Node.list())
 
   # --- VM records -----------------------------------------------------------
 

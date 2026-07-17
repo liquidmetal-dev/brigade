@@ -13,15 +13,18 @@ defmodule Brigade.Application do
     ]
 
     # Horde registry + dynamic supervisor + singleton scheduler starter.
+    # libcluster first so peers are connected when the store joins the mesh;
+    # the store's nodeup handler is the backstop for async/late joins.
+    # Mnesia tables must exist (and be mesh-joined) before anything
+    # reads/writes state or the scheduler starts.
     children =
       [
         # gRPC client connection pool — HostDriver dials each host's flintlockd
         # through this (south edge). Required by grpc >= 0.11.
-        {GRPC.Client.Supervisor, []},
-        # Mnesia tables must exist before anything reads/writes state.
-        Brigade.Store.Mnesia.Setup
+        {GRPC.Client.Supervisor, []}
       ] ++
         maybe_libcluster() ++
+        [Brigade.Store.Mnesia.Cluster] ++
         Brigade.Cluster.child_specs(scheduler_opts) ++
         maybe_self_register() ++
         maybe_local_flintlock() ++
