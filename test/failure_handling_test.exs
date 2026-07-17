@@ -10,6 +10,7 @@ defmodule Brigade.FailureHandlingTest do
   use ExUnit.Case, async: false
 
   alias Flintlock.Types
+  alias Microvm.Services.Api.V1alpha1, as: Api
   alias Brigade.{Host, VMRecord, Store.Mnesia, Scheduler}
 
   @flintlock_port 59_095
@@ -149,6 +150,39 @@ defmodule Brigade.FailureHandlingTest do
       # min_cluster_size 1 -> always in quorum -> placement proceeds.
       assert {:ok, %{host: %{id: @local_id}}} = Scheduler.reserve(demand, majority)
     end
+  end
+
+  describe "scheduler unavailable (singleton absent mid-failover)" do
+    # Any unregistered name resolves to no process, so GenServer.call exits :noproc —
+    # exactly the failure the gRPC edge sees while the Horde singleton is re-homing.
+    @dead_server :no_such_scheduler_proc
+
+    test "reserve maps a dead scheduler to {:error, :scheduler_unavailable}" do
+      demand = %{vcpu: 1, memory_mb: 1, provider: nil, constraints: %{}}
+      assert {:error, :scheduler_unavailable} = Scheduler.reserve(demand, @dead_server)
+    end
+
+    test "confirm/release are best-effort and return :ok when the scheduler is gone" do
+      record = %VMRecord{uid: "u1", namespace: "ns", host_id: @local_id, state: :created}
+      assert :ok = Scheduler.confirm(make_ref(), record, @dead_server)
+      assert :ok = Scheduler.release(make_ref(), @dead_server)
+    end
+
+    test "create_micro_vm raises UNAVAILABLE (not an uncaught exit) when scheduler is absent" do
+      prev = Application.get_env(:brigade, :scheduler)
+      Application.put_env(:brigade, :scheduler, @dead_server)
+      on_exit(fn -> restore_env(:scheduler, prev) end)
+
+      req = %Api.CreateMicroVMRequest{
+        microvm: %Types.MicroVMSpec{vcpu: 1, memory_in_mb: 512}
+      }
+
+      err = assert_raise GRPC.RPCError, fn -> Brigade.GRPC.Server.create_micro_vm(req, nil) end
+      assert err.status == GRPC.Status.unavailable()
+    end
+
+    defp restore_env(_key, nil), do: Application.delete_env(:brigade, :scheduler)
+    defp restore_env(key, val), do: Application.put_env(:brigade, key, val)
   end
 
   describe "nodedown" do

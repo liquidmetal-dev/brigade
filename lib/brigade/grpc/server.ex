@@ -47,6 +47,11 @@ defmodule Brigade.GRPC.Server do
         raise GRPC.RPCError,
           status: :unavailable,
           message: "scheduler partition lacks quorum; placement refused"
+
+      {:error, :scheduler_unavailable} ->
+        raise GRPC.RPCError,
+          status: :unavailable,
+          message: "scheduler momentarily unavailable; retry"
     end
   end
 

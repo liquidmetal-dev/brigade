@@ -71,6 +71,28 @@ defmodule Brigade.ClusterSingletonTest do
     end
   end
 
+  test "guardian resurrects the singleton after a graceful stop (Horde won't restart it)", %{
+    nodes: nodes
+  } do
+    all = [node() | nodes]
+
+    {:ok, pid1} = eventually_singleton(all)
+    owner = node(pid1)
+
+    # Graceful terminate via the Horde supervisor: the scheduler is `restart:
+    # :transient`, so a normal shutdown is NOT restarted by Horde. Only the
+    # guardian's periodic re-ensure can bring it back — which is the fix under test.
+    _ =
+      :erpc.call(owner, Horde.DynamicSupervisor, :terminate_child, [
+        Brigade.Cluster.supervisor(),
+        pid1
+      ])
+
+    {:ok, pid2} = eventually_singleton(all)
+    assert pid2 != pid1
+    assert node(pid2) in all
+  end
+
   # --- helpers --------------------------------------------------------------
 
   defp start_peer(name) do
