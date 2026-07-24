@@ -1,6 +1,6 @@
 # Vendored flintlock protos
 
-**Pinned to flintlock `v0.9.1`** (identical to `main` at vendor time).
+**Pinned to flintlock `v0.11.0`** (identical to `main` at vendor time).
 Source: https://github.com/liquidmetal-dev/flintlock
 
 Brigade implements this gRPC contract verbatim so clients treat Brigade as a

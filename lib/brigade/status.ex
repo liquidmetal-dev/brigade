@@ -30,6 +30,7 @@ defmodule Brigade.Status do
     %{
       node: Node.self(),
       scheduler_node: scheduler_node(),
+      flintlock_api_version: Application.get_env(:brigade, :flintlock_api_version),
       partition: %{
         size: length(members),
         members: members,

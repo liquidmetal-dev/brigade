@@ -92,6 +92,7 @@ defmodule Mix.Tasks.Proto.Bump do
     )
 
     update_readme_pin(ref)
+    update_config_pin(ref)
 
     if generate? do
       Mix.shell().info("  regenerating stubs")
@@ -195,6 +196,26 @@ defmodule Mix.Tasks.Proto.Bump do
       if updated != body do
         File.write!(path, updated)
         Mix.shell().info("  updated pin reference in #{path}")
+      end
+    end
+  end
+
+  # Keep the exposed flintlock_api_version (surfaced on GET /status) in lockstep
+  # with the pin. Mirrors update_readme_pin/1.
+  defp update_config_pin(ref) do
+    path = "config/config.exs"
+
+    with {:ok, body} <- File.read(path) do
+      updated =
+        String.replace(
+          body,
+          ~r/flintlock_api_version: "v[^"]+"/,
+          ~s(flintlock_api_version: "#{ref}")
+        )
+
+      if updated != body do
+        File.write!(path, updated)
+        Mix.shell().info("  updated flintlock_api_version in #{path}")
       end
     end
   end

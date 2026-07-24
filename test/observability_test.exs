@@ -88,6 +88,7 @@ defmodule Brigade.ObservabilityTest do
 
     assert snap.partition.in_quorum == true
     assert snap.schedulable_hosts == 1
+    assert snap.flintlock_api_version == "v0.11.0"
     h = Enum.find(snap.hosts, &(&1.id == "h3"))
     assert h.committed.vcpu == 3
     assert h.free.vcpu == 5
@@ -101,6 +102,7 @@ defmodule Brigade.ObservabilityTest do
     assert status.status == 200
     body = Jason.decode!(status.resp_body)
     assert body["schedulable_hosts"] == 1
+    assert body["flintlock_api_version"] == "v0.11.0"
 
     health = conn(:get, "/healthz") |> Brigade.Status.Router.call([])
     assert health.status == 200

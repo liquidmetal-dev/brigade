@@ -455,6 +455,21 @@ defmodule Flintlock.Types.MicroVMSpec do
           proto3_optional: true,
           __unknown_fields__: [],
           __protobuf__: true
+        },
+        %Google.Protobuf.FieldDescriptorProto{
+          name: "allow_guest_agent",
+          extendee: nil,
+          number: 17,
+          label: :LABEL_OPTIONAL,
+          type: :TYPE_BOOL,
+          type_name: nil,
+          default_value: nil,
+          options: nil,
+          oneof_index: nil,
+          json_name: "allowGuestAgent",
+          proto3_optional: nil,
+          __unknown_fields__: [],
+          __protobuf__: true
         }
       ],
       nested_type: [
@@ -624,6 +639,7 @@ defmodule Flintlock.Types.MicroVMSpec do
   field(:deleted_at, 14, type: Google.Protobuf.Timestamp, json_name: "deletedAt")
   field(:uid, 15, proto3_optional: true, type: :string)
   field(:provider, 16, proto3_optional: true, type: :string)
+  field(:allow_guest_agent, 17, type: :bool, json_name: "allowGuestAgent")
 end
 
 defmodule Flintlock.Types.Kernel.CmdlineEntry do
@@ -1754,6 +1770,21 @@ defmodule Flintlock.Types.MicroVMStatus do
           proto3_optional: nil,
           __unknown_fields__: [],
           __protobuf__: true
+        },
+        %Google.Protobuf.FieldDescriptorProto{
+          name: "vsock_path",
+          extendee: nil,
+          number: 7,
+          label: :LABEL_OPTIONAL,
+          type: :TYPE_STRING,
+          type_name: nil,
+          default_value: nil,
+          options: nil,
+          oneof_index: nil,
+          json_name: "vsockPath",
+          proto3_optional: nil,
+          __unknown_fields__: [],
+          __protobuf__: true
         }
       ],
       nested_type: [
@@ -1934,6 +1965,7 @@ defmodule Flintlock.Types.MicroVMStatus do
   )
 
   field(:retry, 6, type: :int32)
+  field(:vsock_path, 7, type: :string, json_name: "vsockPath")
 end
 
 defmodule Flintlock.Types.VolumeStatus do
