@@ -960,7 +960,7 @@ defmodule Microvm.Services.Api.V1alpha1.MicroVM.Service do
             path: [2],
             span: [8, 0, 38],
             leading_comments:
-              " Brigade codegen input. Wire-identical to flintlock v0.9.1\n api/services/microvm/v1alpha1/microvms.proto (pristine copy under proto/vendor/).\n The grpc-gateway REST/openapiv2 annotations (google.api.http, openapiv2_swagger)\n have been removed: they affect ONLY the HTTP/JSON gateway, never the gRPC wire\n format, and Brigade is gRPC-only day 1. Service/message/field definitions are\n byte-for-byte the upstream contract, so generated stubs match flintlock exactly.\n",
+              " Brigade codegen input. Wire-identical to flintlock v0.11.0\n api/services/microvm/v1alpha1/microvms.proto (pristine copy under proto/vendor/).\n The grpc-gateway REST/openapiv2 annotations (google.api.http, openapiv2_swagger)\n have been removed: they affect ONLY the HTTP/JSON gateway, never the gRPC wire\n format, and Brigade is gRPC-only day 1. Service/message/field definitions are\n byte-for-byte the upstream contract, so generated stubs match flintlock exactly.\n",
             trailing_comments: nil,
             leading_detached_comments: [],
             __unknown_fields__: [],

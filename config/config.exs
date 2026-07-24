@@ -22,6 +22,9 @@ config :brigade,
   flintlock_auth_token: nil,
   # nil = plaintext; %{cacertfile:, certfile:, keyfile:} = mTLS to flintlock.
   flintlock_tls: nil,
+  # flintlock gRPC API contract this build implements (pin in proto/README.md).
+  # Kept in sync by `mix proto.bump`; surfaced on GET /status.
+  flintlock_api_version: "v0.11.0",
   self_register: true,
   # Local flintlock liveness + drift reconcile (topology A).
   local_flintlock: true,

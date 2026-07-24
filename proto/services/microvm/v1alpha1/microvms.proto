@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-// Brigade codegen input. Wire-identical to flintlock v0.9.1
+// Brigade codegen input. Wire-identical to flintlock v0.11.0
 // api/services/microvm/v1alpha1/microvms.proto (pristine copy under proto/vendor/).
 // The grpc-gateway REST/openapiv2 annotations (google.api.http, openapiv2_swagger)
 // have been removed: they affect ONLY the HTTP/JSON gateway, never the gRPC wire
